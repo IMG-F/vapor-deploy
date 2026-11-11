@@ -1,107 +1,79 @@
 import { readFileSync } from "fs";
-import { Project } from "./types/project";
-import { MD5 } from "crypto-js";
+import { lib, MD5 } from "crypto-js";
 import OSS from "ali-oss";
-import { error, info, warning } from "@actions/core";
-import { Teamwork } from "@ccw-api/teamwork";
+import { warning } from "@actions/core";
+import { parseHTML } from "linkedom";
+import { getExtInfo } from "ext-preview";
+import { saveProject } from "./saveProject";
+
+const { document } = parseHTML(
+  "<!DOCTYPE html><html><head></head><body></body></html>",
+);
+(globalThis as any).document = document;
 
 function getDate(): string {
   return new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" });
 }
 
-async function updateComment(
-  project: Project,
-  userInfo: { name: string; oid: string },
-  tw?: Teamwork,
-): Promise<Project> {
-  const stage = project.targets.find((t) => t.isStage);
-  if (!stage) {
-    throw new Error("failed to get stage target");
-  }
-  const comment = {
-    id: "CCW_EXT_DEPLOY",
-    blockId: null,
-    x: 0,
-    y: 0,
-    width: 400,
-    height: 200,
-    minimized: false,
-    text: `[Deployed by CCW-Extension-Deployment workflow]
-repo: ${process.env.GITHUB_REPOSITORY}
-actor: ${process.env.GITHUB_ACTOR}
-sha: ${process.env.GITHUB_SHA}
-time: ${getDate()}
-ccw token: ${userInfo.oid}(${userInfo.name})`,
-  };
-  if (tw) {
-    if (!stage.id) {
-      error(
-        "[CCW Extension Deploy] Failed to get Stage target id of the teamwork project!",
-      );
-      throw new Error("Failed to get Stage target id");
-    }
-    if ("CCW_EXT_DEPLOY" in stage.comments) {
-      await tw.updateComment(stage.id, comment);
-    } else {
-      await tw.createComment(stage.id, comment);
-    }
-  }
-  info("[CCW Extension Deploy] Successfully updated metadata comment!");
-  stage.comments["CCW_EXT_DEPLOY"] = comment;
-  return project;
+async function saveExtFile(
+  oss: OSS,
+  extContent: string
+): Promise<string> {
+  return saveStringAsset(oss, extContent, "js");
 }
 
-async function updateExtFile(
-  project: Project,
+async function saveSvg(
   oss: OSS,
-  extPath: string,
-  tw?: Teamwork,
-): Promise<Project> {
-  if (!project.gandi) {
-    project.gandi = {
-      assets: [],
-    };
-  }
-  const { assets } = project.gandi;
-  const extContent = readFileSync(extPath).toString("utf-8");
-  const extMD5 = MD5(extContent).toString();
+  svg: string,
+): Promise<string> {
+  return saveStringAsset(oss, svg, "svg");
+}
+
+export async function saveStringAsset(
+  oss: OSS,
+  content: string,
+  format: string,
+): Promise<string> {
+  const md5 = MD5(content).toString();
   try {
-    await oss.put(`user_projects_assets/${extMD5}.js`, Buffer.from(extContent));
+    await oss.put(`user_projects_assets/${md5}.${format}`, Buffer.from(content));
   } catch (e) {
-    warning(`[CCW Extension Deploy] OSS File ${extMD5}.js already exists`);
+    warning(`[CCW Extension Deploy] OSS File ${md5}.${format} already exists`);
   }
-  let extAsset = assets.find((a) => a.name == "extension");
-  if (!extAsset) {
-    extAsset = {
-      id: "EXTENSION".padStart(20, "_"),
-      assetId: extMD5,
-      name: "extension",
-      md5ext: `${extMD5}.js`,
-      dataFormat: "js",
-    };
-    if (tw) {
-      await tw.createGandiAsset(extAsset);
-    }
-    assets.push(extAsset);
+  return `https://m.ccw.site/user_projects_assets/${md5}.${format}`;
+}
+
+export async function saveCover(
+  oss: OSS,
+  coverPath: string,
+  userFolder: string,
+): Promise<string> {
+  const format = coverPath.split(".").pop() || "png";
+  const cover = readFileSync(coverPath);
+  const md5 = MD5(lib.WordArray.create(cover)).toString();
+  try {
+    await oss.put(`works-covers/${userFolder}/${md5}.${format}`, Buffer.from(cover));
+  } catch (e) {
+    warning(`[CCW Extension Deploy] OSS File ${md5}.${format} already exists`);
   }
-  extAsset.assetId = extMD5;
-  extAsset.md5ext = `${extMD5}.js`;
-  if (tw) {
-    await tw.updateGandiAsset(extAsset);
-  }
-  info(`[CCW Extension Deploy] Successfully updated extension asset!`);
-  project.gandi.assets = assets;
-  return project;
+  return `https://m.ccw.site/works-covers/${userFolder}/${md5}.${format}`;
 }
 
 export async function deploy(
-  project: Project,
   oss: OSS,
   extPath: string,
-  userInfo: { name: string; oid: string },
-  teamwork?: Teamwork,
-) {
-  project = await updateExtFile(project, oss, extPath, teamwork);
-  project = await updateComment(project, userInfo, teamwork);
-  return project;
+  eid: string,
+  userFolder: string,
+  sb3MD5: string,
+  coverPath: string,
+): Promise<{projectLink: string, previewSvg: string, coverLink: string, extLink: string}> {
+  const extContent = readFileSync(extPath).toString("utf-8");
+  const extMD5 = MD5(extContent).toString();
+  
+  const extLink = await saveExtFile(oss, extContent);
+  const {project, svg} = await getExtInfo(extContent, extLink, eid, extMD5);
+  const projectLink = await saveProject(oss, userFolder, sb3MD5, project);
+  const previewSvg = await saveSvg(oss, svg);
+  const coverLink = await saveCover(oss, coverPath, userFolder);
+  return {projectLink, previewSvg, coverLink, extLink};
 }

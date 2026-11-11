@@ -14,11 +14,13 @@
   "dependencies": {
     "@actions/core": "^3.0.1",
     "@ccw-api/api": "^1.0.1",
-    "@ccw-api/request": "^1.2.1",
+    "@ccw-api/request": "^1.2.3",
     "@ccw-api/teamwork": "^1.0.1",
     "ali-oss": "^6.23.0",
     "crypto-js": "^4.2.0",
-    "jszip": "^3.10.1"
+    "ext-preview": "file:ext-preview",
+    "jszip": "^3.10.1",
+    "linkedom": "^0.18.15"
   },
   "devDependencies": {
     "@types/ali-oss": "^6.23.3",

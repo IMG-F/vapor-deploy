@@ -1,0 +1,20 @@
+{
+  "name": "ext-preview",
+  "version": "1.0.0",
+  "main": "./dist/ext-preview.js",
+  "types": "./dist/ext-preview.d.ts",
+  "scripts": {
+    "build": "vite build"
+  },
+  "author": "IMG",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "ext-blocks": "file:libs/ext-blocks",
+    "gandi-vm": "file:libs/gandi-vm",
+    "vite": "^8.3.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}

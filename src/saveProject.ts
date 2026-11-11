@@ -1,5 +1,4 @@
 import OSS from "ali-oss";
-import { Project } from "./types/project";
 import { AES, enc, mode } from "crypto-js";
 import JSZip from "jszip";
 
@@ -7,10 +6,9 @@ export async function saveProject(
   oss: OSS,
   userFolder: string,
   sb3MD5: string,
-  project: Project,
-  isTeamwork: boolean,
-) {
-  const encryptedProjectJSON = encryptProjectJSON(project);
+  projectJson: string,
+): Promise<string> {
+  const encryptedProjectJSON = encryptProjectJSON(projectJson);
   const sb3 = new JSZip();
   sb3.file("project.json", encryptedProjectJSON);
   const bytes = await sb3.generateAsync({
@@ -22,9 +20,8 @@ export async function saveProject(
   });
   const encryptedSb3 = encryptSb3(bytes, sb3MD5);
   const buffer = Buffer.from(encryptedSb3);
-  if (!isTeamwork) {
-    await oss.put(`user_projects_sb3/${userFolder}/${sb3MD5}.sb3`, buffer);
-  }
+  await oss.put(`user_projects_sb3/${userFolder}/${sb3MD5}.sb3`, buffer);
+  return `https://m.ccw.site/user_projects_sb3/${userFolder}/${sb3MD5}.sb3`;
 }
 
 function encryptSb3(bytes: Uint8Array, sb3MD5: string) {
@@ -40,9 +37,9 @@ function encryptSb3(bytes: Uint8Array, sb3MD5: string) {
   }).toString();
 }
 
-function encryptProjectJSON(project: Project) {
+function encryptProjectJSON(projectJson: string) {
   const map = ["b", "x", "e", "y", "g", "i", "u", "c", "1", "2", "c"];
-  const projectJSON = JSON.stringify(project);
+  const projectJSON = JSON.stringify(projectJson);
   const plainBs64 = btoa(encodeURIComponent(projectJSON));
   const { length: t } = plainBs64;
   const n = t % 10;
