@@ -1,5 +1,5 @@
-name: CCW Extension Deployment
-description: Deploy Extension To CCW
+name: Vapor Deploy
+description: Deploy vapor To CCW
 branding:
   icon: upload-cloud
   color: blue
