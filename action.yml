@@ -14,6 +14,27 @@ inputs:
   token:
     description: ccw token
     required: true
+  eid:
+    description: extension id
+    required: true
+  cover:
+    description: cover path
+    required: true
+  version:
+    description: extension version
+    required: true
+  name:
+    description: extension name
+    required: true
+  desc:
+    description: extension description
+    required: true
+  readme:
+    description: extension docs
+    required: true
+  changelog:
+    description: extension changelog
+    required: true
 runs:
   using: node24
   main: dist/index.cjs
